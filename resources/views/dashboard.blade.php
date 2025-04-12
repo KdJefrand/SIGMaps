@@ -16,6 +16,11 @@
                             {{ __('Detail: Klik pada peta untuk melihat alamat') }}
                         </h2>
                     </div>
+                    <div class="mt-4 flex">
+                        <h2 id="detailText" class="font-semibold text-xl text-red-800 dark:text-red-200 leading-tight">
+                            {{ __('Klik kanan pada objek untuk menghapus objek') }}
+                        </h2>
+                    </div>
                 </div>
             </div>
         </div>

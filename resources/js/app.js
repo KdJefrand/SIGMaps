@@ -31,6 +31,102 @@ document.addEventListener("DOMContentLoaded", function () {
 
     osm.addTo(map);
 
+    fetch('/get-locations')
+    .then(response => response.json())
+    .then(dataList => {
+        dataList.forEach(item => {
+            console.log(item);
+            const geojson = JSON.parse(item.geojson);
+
+            let layer;
+
+            if (geojson.properties?.type === 'Circle') {
+                const coordinates = geojson.geometry.coordinates;
+                const radius = geojson.properties.radius;
+
+                layer = L.circle([coordinates[1], coordinates[0]], {
+                    radius: radius
+                });
+            } else {
+                layer = L.geoJSON(geojson);
+            }
+
+            if (item.popup_text) {
+                layer.bindPopup(item.popup_text);
+            }
+
+            layer.options.locationId = item.id;
+            layer.addTo(map);
+
+            // Penanganan klik kanan (context menu) untuk hapus
+            if (layer instanceof L.GeoJSON) {
+                layer.eachLayer(function (subLayer) {
+                    subLayer.options.locationId = item.id;
+
+                    subLayer.on('contextmenu', function (e) {
+                        const locationId = e.target.options.locationId;
+
+                        if (!locationId) {
+                            alert("ID lokasi tidak ditemukan!");
+                            return;
+                        }
+
+                        if (confirm("Yakin ingin menghapus lokasi ini?")) {
+                            map.removeLayer(e.target);
+
+                            fetch(`/delete-location/${locationId}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                }
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    console.log('Berhasil dihapus:', data);
+                                })
+                                .catch(error => {
+                                    console.error('Gagal hapus:', error);
+                                });
+                        }
+                    });
+                });
+            } else {
+                // Untuk layer Circle langsung (karena tidak dalam L.GeoJSON)
+                layer.on('contextmenu', function (e) {
+                    const locationId = e.target.options.locationId;
+
+                    if (!locationId) {
+                        alert("ID lokasi tidak ditemukan!");
+                        return;
+                    }
+
+                    if (confirm("Yakin ingin menghapus lokasi ini?")) {
+                        map.removeLayer(e.target);
+
+                        fetch(`/delete-location/${locationId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                console.log('Berhasil dihapus:', data);
+                            })
+                            .catch(error => {
+                                console.error('Gagal hapus:', error);
+                            });
+                    }
+                });
+            }
+        });
+    });
+
+
     var baseMaps = {
         "Standar": osm,
         "Dark Mode": dark,
@@ -39,7 +135,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     L.control.layers(baseMaps).addTo(map);
 
-    // Pop-Up
     var popup = L.popup();
 
     function onMapClick(e) {
@@ -72,12 +167,53 @@ document.addEventListener("DOMContentLoaded", function () {
     map.on(L.Draw.Event.CREATED, function (event) {
         var layer = event.layer;
         drawnItems.addLayer(layer);
-        if (event.layerType === 'marker') {
-            var popupContent = prompt("Masukkan teks untuk pop-up:", "Lokasi Baru");
-            if (popupContent) {
-                layer.bindPopup(popupContent).openPopup();
-            }
+
+        let popupContent = prompt("Masukkan teks untuk pop-up:", "Lokasi Baru");
+        if (popupContent) {
+            layer.bindPopup(popupContent).openPopup();
         }
+
+        let geojson;
+
+        if (layer instanceof L.Circle) {
+            const center = layer.getLatLng();
+            const radius = layer.getRadius();
+
+            geojson = {
+                type: "Feature",
+                properties: {
+                    type: "Circle",
+                    radius: radius,
+                    popup_text: popupContent
+                },
+                geometry: {
+                    type: "Point",
+                    coordinates: [center.lng, center.lat]
+                }
+            };
+        } else {
+            geojson = layer.toGeoJSON();
+        }
+
+        fetch('/save-loc', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                geojson: geojson,
+                popup_text: popupContent,
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Berhasil disimpan:', data);
+        })
+        .catch(error => {
+            console.error('Gagal menyimpan:', error);
+        });
     });
 
     var detailText = document.getElementById("detailText");

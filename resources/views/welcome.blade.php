@@ -71,7 +71,7 @@
 
                 <div class="mt-4 flex items-center gap-2">
                     <p class="py-1.5 dark:text-[#EDEDEC] border-[#19140035] hover:border-[#1915014a] border text-[#1b1b18] text-sm leading-normal">
-                        Butuh lebih banyak fitur?
+                        Login untuk mendapat lebih banyak fitur  |
                     </p>
                     <a
                         href="{{ route('login') }}"
